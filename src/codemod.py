@@ -42,6 +42,8 @@ Options (all optional) include:
 
   -a
     codemod operates on files of all extensions.
+  -g
+    Source files from git ls-files
   -m
     Have regex work over multiple lines (e.g. have dot match newlines).  By
     default, codemod applies the regex one line at a time.
@@ -81,7 +83,7 @@ See the documentation for the Query class for details.
 """
 
 
-import sys, os
+import subprocess, sys, os
 
 def path_filter(extensions=None, exclude_paths=[]):
   """
@@ -254,6 +256,9 @@ def _index_to_row_col(lines, index):
     current_index += line_length
   raise IndexError('index %d out of range' % index)
 
+class _FileSource :
+  RecursiveFind = 'RecursiveFind'
+  GitLsFiles = 'GitLsFiles'
 
 class Query:
   """
@@ -269,7 +274,8 @@ class Query:
                start=None,
                end=None,
                root_directory='.',
-               path_filter=_default_path_filter):
+               path_filter=_default_path_filter,
+               file_source=_FileSource.RecursiveFind):
     """
     @param suggestor            A function that takes a list of lines and
                                 generates instances of Patch to suggest.
@@ -297,6 +303,7 @@ class Query:
     self._end               = end
     self.root_directory     = root_directory
     self.path_filter        = path_filter
+    self.file_source        = file_source
     self._all_patches_cache = None
 
   def clone(self):
@@ -358,7 +365,7 @@ class Query:
     start_pos = self.start_position or Position(None, None)
     end_pos   = self.end_position   or Position(None, None)
 
-    path_list = Query._walk_directory(self.root_directory)
+    path_list = Query._walk_directory(self.root_directory, self.file_source)
     path_list = Query._sublist(path_list, start_pos.path, end_pos.path)
     path_list = (path for path in path_list if
                  Query._path_looks_like_code(path) and self.path_filter(path))
@@ -384,15 +391,25 @@ class Query:
     run_interactive(self, **kargs)
 
   @staticmethod
-  def _walk_directory(root_directory):
+  def _walk_directory(root_directory, file_source):
     """
     Generates the paths of all files that are ancestors of `root_directory`.
     """
 
-    paths = [os.path.join(root, name)
-             for root, dirs, files in os.walk(root_directory)
-             for name in files]
-    paths.sort()
+    if (file_source == _FileSource.GitLsFiles) :
+      start_dir = os.getcwd()
+      os.chdir(root_directory)
+
+      git_output = subprocess.check_output(['git', 'ls-files'])
+      paths = git_output.strip().split('\n')
+      print paths
+
+      os.chdir(start_dir)
+    else:
+      paths = [os.path.join(root, name)
+               for root, dirs, files in os.walk(root_directory)
+               for name in files]
+      paths.sort()
     return paths
 
   @staticmethod
@@ -752,7 +769,7 @@ def _parse_command_line():
   import getopt, sys, re
   try:
     opts, remaining_args = getopt.gnu_getopt(
-        sys.argv[1:], 'amd:',
+        sys.argv[1:], 'agmd:',
         ['start=', 'end=', 'extensions=', 'editor=', 'count', 'test'])
   except getopt.error:
     raise _UsageException()
@@ -779,6 +796,10 @@ def _parse_command_line():
     query_options['root_directory'] = opts['-d']
   if '-a' in opts :
     query_options['path_filter'] = (path_filter())
+  if '-g' in opts :
+    query_options['file_source'] = _FileSource.GitLsFiles
+  else:
+    query_options['file_source'] = _FileSource.RecursiveFind
   if '--extensions' in opts:
     query_options['path_filter'] = (
         path_filter(extensions=opts['--extensions'].split(',')))
