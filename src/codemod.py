@@ -40,6 +40,8 @@ Usage: last two arguments are a regular expression to match and a substitution
 
 Options (all optional) include:
 
+  -a
+    codemod operates on files of all extensions.
   -m
     Have regex work over multiple lines (e.g. have dot match newlines).  By
     default, codemod applies the regex one line at a time.
@@ -55,7 +57,7 @@ Options (all optional) include:
     *before* which we should stop exploring, or a percentage of the way
     through, just before which to end.
   --extensions
-    A comma-delimited list of file extensions to process.
+    A comma-delimited list of file extensions to process. Overrides -a
   --editor
     Specify an editor, e.g. "vim" or "emacs".  If omitted, defaults to $EDITOR
     environment variable.
@@ -750,7 +752,7 @@ def _parse_command_line():
   import getopt, sys, re
   try:
     opts, remaining_args = getopt.gnu_getopt(
-        sys.argv[1:], 'md:',
+        sys.argv[1:], 'amd:',
         ['start=', 'end=', 'extensions=', 'editor=', 'count', 'test'])
   except getopt.error:
     raise _UsageException()
@@ -775,6 +777,8 @@ def _parse_command_line():
     query_options['end'] = opts['--end']
   if '-d' in opts:
     query_options['root_directory'] = opts['-d']
+  if '-a' in opts :
+    query_options['path_filter'] = (path_filter())
   if '--extensions' in opts:
     query_options['path_filter'] = (
         path_filter(extensions=opts['--extensions'].split(',')))
