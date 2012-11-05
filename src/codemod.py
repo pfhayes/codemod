@@ -400,9 +400,14 @@ class Query:
       start_dir = os.getcwd()
       os.chdir(root_directory)
 
-      git_output = subprocess.check_output(['git', 'ls-files'])
+      try :
+        git_output = subprocess.check_output(['git', 'ls-files'])
+      except subprocess.CalledProcessError as e:
+        if e.returncode == 128 :
+          print 'Option -g cannot be used outside a git repository'
+          return []
+
       paths = git_output.strip().split('\n')
-      print paths
 
       os.chdir(start_dir)
     else:
