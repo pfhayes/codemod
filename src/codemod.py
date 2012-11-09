@@ -407,7 +407,8 @@ class Query:
           print 'Option -g cannot be used outside a git repository'
           return []
 
-      paths = git_output.strip().split('\n')
+      paths = [path for path in git_output.strip().split('\n')
+               if not os.path.isdir(path)]
 
       os.chdir(start_dir)
     else:
